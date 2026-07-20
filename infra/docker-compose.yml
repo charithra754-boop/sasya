@@ -37,12 +37,15 @@ services:
       - AUTH_SERVICE_URL=http://auth-service:8001
       - USER_SERVICE_URL=http://user-service:8002
       - FARMER_SERVICE_URL=http://farmer-service:8003
+      - DIGITAL_TWIN_SERVICE_URL=http://digital-twin:8004
     depends_on:
       auth-service:
         condition: service_started
       user-service:
         condition: service_started
       farmer-service:
+        condition: service_started
+      digital-twin:
         condition: service_started
 
   auth-service:
@@ -75,6 +78,18 @@ services:
       dockerfile: backend/farmer-service/Dockerfile
     ports:
       - "8003:8003"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/sasya
+    depends_on:
+      db:
+        condition: service_healthy
+
+  digital-twin:
+    build:
+      context: ..
+      dockerfile: backend/digital-twin/Dockerfile
+    ports:
+      - "8004:8004"
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/sasya
     depends_on:

@@ -21,11 +21,13 @@ app.add_middleware(
 AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth-service:8001")
 USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://user-service:8002")
 FARMER_SERVICE_URL = os.getenv("FARMER_SERVICE_URL", "http://farmer-service:8003")
+DIGITAL_TWIN_SERVICE_URL = os.getenv("DIGITAL_TWIN_SERVICE_URL", "http://digital-twin:8004")
 
 SERVICE_MAP = {
     "auth": AUTH_SERVICE_URL,
     "users": USER_SERVICE_URL,
     "farmers": FARMER_SERVICE_URL,
+    "digital-twin": DIGITAL_TWIN_SERVICE_URL,
 }
 
 @app.get("/health", tags=["Infrastructure"])
