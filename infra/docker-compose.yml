@@ -39,6 +39,7 @@ services:
       - FARMER_SERVICE_URL=http://farmer-service:8003
       - DIGITAL_TWIN_SERVICE_URL=http://digital-twin:8004
       - KNOWLEDGE_SERVICE_URL=http://knowledge:8005
+      - ORCHESTRATOR_AGENT_URL=http://orchestrator-agent:8010
     depends_on:
       auth-service:
         condition: service_started
@@ -49,6 +50,8 @@ services:
       digital-twin:
         condition: service_started
       knowledge:
+        condition: service_started
+      orchestrator-agent:
         condition: service_started
 
   auth-service:
@@ -110,6 +113,55 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  orchestrator-agent:
+    build:
+      context: ..
+      dockerfile: agents/orchestrator/Dockerfile
+    ports:
+      - "8010:8010"
+    environment:
+      - DIGITAL_TWIN_SERVICE_URL=http://digital-twin:8004
+      - PLANNER_AGENT_URL=http://planner-agent:8011
+      - VISION_AGENT_URL=http://vision-agent:8012
+      - GEOSPATIAL_AGENT_URL=http://geospatial-agent:8013
+      - MONITORING_AGENT_URL=http://monitoring-agent:8014
+
+  planner-agent:
+    build:
+      context: ..
+      dockerfile: agents/planner/Dockerfile
+    ports:
+      - "8011:8011"
+    environment:
+      - KNOWLEDGE_SERVICE_URL=http://knowledge:8005
+
+  vision-agent:
+    build:
+      context: ..
+      dockerfile: agents/vision/Dockerfile
+    ports:
+      - "8012:8012"
+    environment:
+      - KNOWLEDGE_SERVICE_URL=http://knowledge:8005
+
+  geospatial-agent:
+    build:
+      context: ..
+      dockerfile: agents/geospatial/Dockerfile
+    ports:
+      - "8013:8013"
+    environment:
+      - KNOWLEDGE_SERVICE_URL=http://knowledge:8005
+
+  monitoring-agent:
+    build:
+      context: ..
+      dockerfile: agents/monitoring/Dockerfile
+    ports:
+      - "8014:8014"
+    environment:
+      - KNOWLEDGE_SERVICE_URL=http://knowledge:8005
 
 volumes:
   postgres_data:

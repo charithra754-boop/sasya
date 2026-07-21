@@ -320,3 +320,64 @@ def test_knowledge_platform():
     assert recs2[0]["rule_id"] == "M-R03"
     assert recs2[0]["action"] == "SELL"
 
+def test_ai_services_orchestrator():
+    agristack_id = TEST_TWIN_AGRISTACK_ID
+
+    # 1. Health check
+    response_health = httpx.get(f"{GATEWAY_URL}/api/v1/orchestrator/health")
+    assert response_health.status_code == 200
+    assert response_health.json()["status"] == "healthy"
+
+    # 2. Query Orchestrator for Crop Plan (Routes to Planner Agent)
+    payload_plan = {
+        "agristack_id": agristack_id,
+        "query": "What should I plant this season and what government schemes can I get?",
+        "language": "en"
+    }
+    resp_plan = httpx.post(f"{GATEWAY_URL}/api/v1/orchestrator/query", json=payload_plan, timeout=10.0)
+    assert resp_plan.status_code == 200
+    res_plan = resp_plan.json()
+    assert "planner" in res_plan["agent_outputs"]
+    assert "recommended_crops" in res_plan["agent_outputs"]["planner"]
+    assert len(res_plan["agent_outputs"]["planner"]["recommended_crops"]) > 0
+    assert "eligible_schemes" in res_plan["agent_outputs"]["planner"]
+
+    # 3. Query Orchestrator for Pest Diagnosis (Routes to Vision Agent)
+    payload_vision = {
+        "agristack_id": agristack_id,
+        "query": "I see worms eating my corn leaves, is it a pest infestation?",
+        "language": "en"
+    }
+    resp_vision = httpx.post(f"{GATEWAY_URL}/api/v1/orchestrator/query", json=payload_vision, timeout=10.0)
+    assert resp_vision.status_code == 200
+    res_vision = resp_vision.json()
+    assert "vision" in res_vision["agent_outputs"]
+    assert res_vision["agent_outputs"]["vision"]["pest_name"] == "Fall Armyworm"
+    assert "recommended_treatment" in res_vision["agent_outputs"]["vision"]
+
+    # 4. Query Orchestrator for Weather & Soil Moisture (Routes to Geospatial Agent)
+    payload_geo = {
+        "agristack_id": agristack_id,
+        "query": "Check the weather risk and soil moisture warnings",
+        "language": "en"
+    }
+    resp_geo = httpx.post(f"{GATEWAY_URL}/api/v1/orchestrator/query", json=payload_geo, timeout=10.0)
+    assert resp_geo.status_code == 200
+    res_geo = resp_geo.json()
+    assert "geospatial" in res_geo["agent_outputs"]
+    assert "ndvi_canopy_greenness" in res_geo["agent_outputs"]["geospatial"]
+    assert "alerts" in res_geo["agent_outputs"]["geospatial"]
+
+    # 5. Query Orchestrator for Market Mandi Rates (Routes to Monitoring Agent)
+    payload_market = {
+        "agristack_id": agristack_id,
+        "query": "Tell me the current mandi price and selling recommendation",
+        "language": "en"
+    }
+    resp_market = httpx.post(f"{GATEWAY_URL}/api/v1/orchestrator/query", json=payload_market, timeout=10.0)
+    assert resp_market.status_code == 200
+    res_market = resp_market.json()
+    assert "monitoring" in res_market["agent_outputs"]
+    assert "current_market_price" in res_market["agent_outputs"]["monitoring"]
+    assert "recommendations" in res_market["agent_outputs"]["monitoring"]
+
