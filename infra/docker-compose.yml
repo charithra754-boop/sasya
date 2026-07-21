@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   db:
-    image: postgres:15
+    image: pgvector/pgvector:pg15
     environment:
       POSTGRES_DB: sasya
       POSTGRES_USER: postgres
@@ -38,6 +38,7 @@ services:
       - USER_SERVICE_URL=http://user-service:8002
       - FARMER_SERVICE_URL=http://farmer-service:8003
       - DIGITAL_TWIN_SERVICE_URL=http://digital-twin:8004
+      - KNOWLEDGE_SERVICE_URL=http://knowledge:8005
     depends_on:
       auth-service:
         condition: service_started
@@ -46,6 +47,8 @@ services:
       farmer-service:
         condition: service_started
       digital-twin:
+        condition: service_started
+      knowledge:
         condition: service_started
 
   auth-service:
@@ -90,6 +93,18 @@ services:
       dockerfile: backend/digital-twin/Dockerfile
     ports:
       - "8004:8004"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/sasya
+    depends_on:
+      db:
+        condition: service_healthy
+
+  knowledge:
+    build:
+      context: ..
+      dockerfile: backend/knowledge/Dockerfile
+    ports:
+      - "8005:8005"
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/sasya
     depends_on:

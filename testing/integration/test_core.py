@@ -202,3 +202,121 @@ def test_digital_twin_lifecycle():
     assert response_get_3.json()["soil"]["nitrogen"] == 45.0
     assert response_get_3.json()["farmer"]["version"] == 3
 
+def test_knowledge_platform():
+    # 1. Health Check
+    response_health = httpx.get(f"{GATEWAY_URL}/api/v1/knowledge/health")
+    assert response_health.status_code == 200
+    assert response_health.json()["status"] == "healthy"
+
+    # 2. Ingest documents
+    doc1 = {
+        "title": "PM-KISAN Scheme Guide",
+        "content": "Under the PM-KISAN scheme, eligible smallholder farmers receive income support of ₹6,000 per year in three equal installments of ₹2,000 each. The benefit is directly credited to bank accounts.",
+        "category": "scheme"
+    }
+    doc2 = {
+        "title": "Urea Fertilizer Guidelines",
+        "content": "Urea is the most widely used nitrogenous fertilizer. Apply maximum 100 kg/ha of Urea within 7 days of sowing to maximize corn leaf vegetative health.",
+        "category": "fertilizer"
+    }
+    doc3 = {
+        "title": "Fall Armyworm Pest Control",
+        "content": "Fall Armyworm is an insect pest affecting corn and maize. To control infestation of armyworm, apply recommended neem oil dosage or chemical sprays like Spinetoram.",
+        "category": "pest"
+    }
+
+    resp1 = httpx.post(f"{GATEWAY_URL}/api/v1/knowledge/ingest", json=doc1)
+    assert resp1.status_code == 201
+    assert resp1.json()["title"] == "PM-KISAN Scheme Guide"
+
+    resp2 = httpx.post(f"{GATEWAY_URL}/api/v1/knowledge/ingest", json=doc2)
+    assert resp2.status_code == 201
+    
+    resp3 = httpx.post(f"{GATEWAY_URL}/api/v1/knowledge/ingest", json=doc3)
+    assert resp3.status_code == 201
+
+    # 3. Query RAG for PM-KISAN Scheme
+    query_scheme = {
+        "query": "What are the benefits of the PM-KISAN subsidy scheme?",
+        "category": "scheme",
+        "limit": 1
+    }
+    resp_q1 = httpx.post(f"{GATEWAY_URL}/api/v1/knowledge/query", json=query_scheme)
+    assert resp_q1.status_code == 200
+    assert len(resp_q1.json()) == 1
+    assert resp_q1.json()[0]["title"] == "PM-KISAN Scheme Guide"
+
+    # 4. Query RAG for Pest Control
+    query_pest = {
+        "query": "How do I control the armyworm pest in my maize crop?",
+        "limit": 1
+    }
+    resp_q2 = httpx.post(f"{GATEWAY_URL}/api/v1/knowledge/query", json=query_pest)
+    assert resp_q2.status_code == 200
+    assert len(resp_q2.json()) == 1
+    assert resp_q2.json()[0]["title"] == "Fall Armyworm Pest Control"
+
+    # 5. Query RAG for Urea
+    query_fertilizer = {
+        "query": "What is the recommended nitrogenous urea fertilizer usage?",
+        "limit": 1
+    }
+    resp_q3 = httpx.post(f"{GATEWAY_URL}/api/v1/knowledge/query", json=query_fertilizer)
+    assert resp_q3.status_code == 200
+    assert len(resp_q3.json()) == 1
+    assert resp_q3.json()[0]["title"] == "Urea Fertilizer Guidelines"
+
+    # 6. Evaluate Weather Rules (Frost Risk)
+    weather_input_frost = {
+        "temperature": 3.2,
+        "humidity": 55.0,
+        "rainfall_forecast": 0.0,
+        "soil_moisture": 30.0
+    }
+    resp_w1 = httpx.post(f"{GATEWAY_URL}/api/v1/knowledge/rules/weather", json=weather_input_frost)
+    assert resp_w1.status_code == 200
+    alerts = resp_w1.json()["alerts"]
+    assert len(alerts) == 1
+    assert alerts[0]["rule_id"] == "W-R01"
+    assert alerts[0]["severity"] == "CRITICAL"
+
+    # 7. Evaluate Weather Rules (Fungus Risk)
+    weather_input_fungus = {
+        "temperature": 27.5,
+        "humidity": 88.0,
+        "rainfall_forecast": 2.0,
+        "soil_moisture": 45.0
+    }
+    resp_w2 = httpx.post(f"{GATEWAY_URL}/api/v1/knowledge/rules/weather", json=weather_input_fungus)
+    alerts2 = resp_w2.json()["alerts"]
+    assert len(alerts2) == 1
+    assert alerts2[0]["rule_id"] == "W-R03"
+    assert alerts2[0]["severity"] == "INFO"
+
+    # 8. Evaluate Market Rules (MSP Hold)
+    market_input_hold = {
+        "crop_name": "Maize",
+        "current_price": 1850.0,
+        "msp_price": 2000.0,
+        "price_change_7d": -1.5
+    }
+    resp_m1 = httpx.post(f"{GATEWAY_URL}/api/v1/knowledge/rules/market", json=market_input_hold)
+    assert resp_m1.status_code == 200
+    recs = resp_m1.json()["recommendations"]
+    assert len(recs) == 1
+    assert recs[0]["rule_id"] == "M-R01"
+    assert recs[0]["action"] == "HOLD"
+
+    # 9. Evaluate Market Rules (High Demand Sell)
+    market_input_sell = {
+        "crop_name": "Maize",
+        "current_price": 2350.0,
+        "msp_price": 2000.0,
+        "price_change_7d": 11.5
+    }
+    resp_m2 = httpx.post(f"{GATEWAY_URL}/api/v1/knowledge/rules/market", json=market_input_sell)
+    recs2 = resp_m2.json()["recommendations"]
+    assert len(recs2) == 1
+    assert recs2[0]["rule_id"] == "M-R03"
+    assert recs2[0]["action"] == "SELL"
+
