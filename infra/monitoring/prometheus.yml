@@ -1,0 +1,48 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'gateway-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['gateway:8000']
+
+  - job_name: 'auth-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['auth-service:8001']
+
+  - job_name: 'user-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['user-service:8002']
+
+  - job_name: 'farmer-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['farmer-service:8003']
+
+  - job_name: 'digital-twin-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['digital-twin:8004']
+
+  - job_name: 'knowledge-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['knowledge:8005']
+
+  - job_name: 'decision-engine-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['decision-engine:8006']
+
+  - job_name: 'orchestrator-agent'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['orchestrator-agent:8010']
