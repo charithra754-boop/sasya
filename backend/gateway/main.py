@@ -23,6 +23,7 @@ USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://user-service:8002")
 FARMER_SERVICE_URL = os.getenv("FARMER_SERVICE_URL", "http://farmer-service:8003")
 DIGITAL_TWIN_SERVICE_URL = os.getenv("DIGITAL_TWIN_SERVICE_URL", "http://digital-twin:8004")
 KNOWLEDGE_SERVICE_URL = os.getenv("KNOWLEDGE_SERVICE_URL", "http://knowledge:8005")
+DECISION_ENGINE_SERVICE_URL = os.getenv("DECISION_ENGINE_SERVICE_URL", "http://decision-engine:8006")
 ORCHESTRATOR_AGENT_URL = os.getenv("ORCHESTRATOR_AGENT_URL", "http://orchestrator-agent:8010")
 
 SERVICE_MAP = {
@@ -31,6 +32,7 @@ SERVICE_MAP = {
     "farmers": FARMER_SERVICE_URL,
     "digital-twin": DIGITAL_TWIN_SERVICE_URL,
     "knowledge": KNOWLEDGE_SERVICE_URL,
+    "decision-engine": DECISION_ENGINE_SERVICE_URL,
     "orchestrator": ORCHESTRATOR_AGENT_URL,
 }
 

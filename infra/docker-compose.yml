@@ -39,6 +39,7 @@ services:
       - FARMER_SERVICE_URL=http://farmer-service:8003
       - DIGITAL_TWIN_SERVICE_URL=http://digital-twin:8004
       - KNOWLEDGE_SERVICE_URL=http://knowledge:8005
+      - DECISION_ENGINE_SERVICE_URL=http://decision-engine:8006
       - ORCHESTRATOR_AGENT_URL=http://orchestrator-agent:8010
     depends_on:
       auth-service:
@@ -50,6 +51,8 @@ services:
       digital-twin:
         condition: service_started
       knowledge:
+        condition: service_started
+      decision-engine:
         condition: service_started
       orchestrator-agent:
         condition: service_started
@@ -162,6 +165,18 @@ services:
       - "8014:8014"
     environment:
       - KNOWLEDGE_SERVICE_URL=http://knowledge:8005
+
+  decision-engine:
+    build:
+      context: ..
+      dockerfile: backend/decision-engine/Dockerfile
+    ports:
+      - "8006:8006"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/sasya
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   postgres_data:

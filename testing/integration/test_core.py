@@ -381,3 +381,83 @@ def test_ai_services_orchestrator():
     assert "current_market_price" in res_market["agent_outputs"]["monitoring"]
     assert "recommendations" in res_market["agent_outputs"]["monitoring"]
 
+def test_decision_engine():
+    # 1. Health check
+    response_health = httpx.get(f"{GATEWAY_URL}/api/v1/decision-engine/health")
+    assert response_health.status_code == 200
+    assert response_health.json()["status"] == "healthy"
+
+    # 2. Setup crop choices for LP optimization solver
+    crop_options = [
+        {
+            "crop_name": "Paddy",
+            "expected_yield_kg_per_hectare": 4000.0,
+            "expected_price_per_kg": 22.0,      # Gross Revenue = ₹88,000/ha
+            "cost_per_hectare": 30000.0,        # Profit = ₹58,000/ha
+            "water_required_liters_per_hectare": 15000000.0  # High water req
+        },
+        {
+            "crop_name": "Maize",
+            "expected_yield_kg_per_hectare": 5000.0,
+            "expected_price_per_kg": 20.0,      # Gross Revenue = ₹100,000/ha
+            "cost_per_hectare": 40000.0,        # Profit = ₹60,000/ha
+            "water_required_liters_per_hectare": 8000000.0   # Medium water req
+        },
+        {
+            "crop_name": "Soybean",
+            "expected_yield_kg_per_hectare": 2500.0,
+            "expected_price_per_kg": 38.0,      # Gross Revenue = ₹95,000/ha
+            "cost_per_hectare": 35000.0,        # Profit = ₹60,000/ha
+            "water_required_liters_per_hectare": 6000000.0   # Low water req
+        }
+    ]
+
+    opt_payload = {
+        "total_land_hectares": 5.0,
+        "water_budget_liters": 40000000.0,  # Limits water intensive crops
+        "capital_budget_rupees": 200000.0,  # Limits high cost crops
+        "crop_options": crop_options
+    }
+
+    # Execute crop allocation optimization
+    resp_opt = httpx.post(f"{GATEWAY_URL}/api/v1/decision-engine/optimize", json=opt_payload)
+    assert resp_opt.status_code == 200
+    res_opt = resp_opt.json()
+    assert res_opt["status"] in ["OPTIMAL", "FEASIBLE"]
+    assert res_opt["optimal_profit_rupees"] > 0
+    assert len(res_opt["allocations"]) > 0
+    assert res_opt["total_land_used_hectares"] <= 5.0
+    assert res_opt["total_water_used_liters"] <= 40000000.0
+    assert res_opt["total_capital_used_rupees"] <= 200000.0
+
+    # 3. Verify a proposed crop plan (Safe Case)
+    verify_payload_safe = {
+        "proposed_allocations": {"Soybean": 3.0, "Maize": 1.0},
+        "crop_options": crop_options,
+        "total_land_hectares": 5.0,
+        "water_budget_liters": 40000000.0,
+        "capital_budget_rupees": 200000.0
+    }
+    resp_v_safe = httpx.post(f"{GATEWAY_URL}/api/v1/decision-engine/verify", json=verify_payload_safe)
+    assert resp_v_safe.status_code == 200
+    res_v_safe = resp_v_safe.json()
+    assert res_v_safe["is_safe"] is True
+    assert len(res_v_safe["violations"]) == 0
+
+    # 4. Verify a proposed crop plan (Unsafe Case: Land & Water Overuse)
+    verify_payload_unsafe = {
+        "proposed_allocations": {"Paddy": 4.0, "Maize": 2.0},
+        "crop_options": crop_options,
+        "total_land_hectares": 5.0,
+        "water_budget_liters": 40000000.0,
+        "capital_budget_rupees": 300000.0
+    }
+    resp_v_unsafe = httpx.post(f"{GATEWAY_URL}/api/v1/decision-engine/verify", json=verify_payload_unsafe)
+    assert resp_v_unsafe.status_code == 200
+    res_v_unsafe = resp_v_unsafe.json()
+    assert res_v_unsafe["is_safe"] is False
+    assert len(res_v_unsafe["violations"]) > 0
+    # Confirms it caught the land limit overrun (6.0 ha > 5.0 ha) or water budget overrun
+    assert any("exceeds farm limit" in v or "exceeds safe budget" in v for v in res_v_unsafe["violations"])
+
+
