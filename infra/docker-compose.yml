@@ -178,5 +178,14 @@ services:
       db:
         condition: service_healthy
 
+  frontend:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - gateway
+
 volumes:
   postgres_data:
