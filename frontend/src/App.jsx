@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   ShieldCheck, Mic, Send, CloudRain, Thermometer, Droplet, 
   Map, TrendingUp, AlertTriangle, CheckCircle, Database, 
-  Leaf, Info, DollarSign, Sprout, Sliders, Play, RefreshCw
+  Leaf, Info, DollarSign, Sprout, Sliders, Play, RefreshCw,
+  Compass, HelpCircle, X, HelpCircle as HelpIcon, ChevronRight, ChevronLeft
 } from 'lucide-react';
 
 const GATEWAY_URL = "http://localhost:8000"; // API Gateway endpoint
@@ -43,6 +44,84 @@ export default function App() {
   const [proposedMaize, setProposedMaize] = useState(2.0);
   const [proposedSoybean, setProposedSoybean] = useState(1.0);
   const [verifyResult, setVerifyResult] = useState(null);
+
+  // Onboarding Intention & Interactive Demo States
+  const [selectedIntention, setSelectedIntention] = useState(null); // 'optimize' | 'advisor' | 'weather' | 'explore'
+  const [hasChosenIntention, setHasChosenIntention] = useState(false);
+  const [demoActive, setDemoActive] = useState(false);
+  const [demoStep, setDemoStep] = useState(0);
+
+  // Onboarding Guided Tours Configuration
+  const tours = {
+    optimize: [
+      {
+        tab: "optimizer",
+        instruction: "Step 1/3 (Crop Optimizer): We've opened the 'Crop Optimizer' tab. Slide the Land, Water, and Budget controls on the right, then click 'Run OR-Tools Optimization' to solve for the best crop mix.",
+        highlightElement: "optimizer-inputs"
+      },
+      {
+        tab: "verifier",
+        instruction: "Step 2/3 (Safety Verifier): We've switched to the 'Plan Safety Verifier' tab. Here you can verify if a manual crop plan exceeds resource limits by running verification.",
+        highlightElement: "verifier-inputs"
+      },
+      {
+        tab: "twin",
+        instruction: "Step 3/3 (Ask Advisor): Ask the AI Advisor on the left, e.g. 'What crop variety should I plant?' to check government scheme eligibility.",
+        highlightElement: "left-advisor"
+      }
+    ],
+    advisor: [
+      {
+        tab: "twin",
+        instruction: "Step 1/2 (Simulate Mic Input): Press the green Mic button in the left panel to simulate speaking a query in your local dialect.",
+        highlightElement: "mic-controls"
+      },
+      {
+        tab: "twin",
+        instruction: "Step 2/2 (Explainability DAG): Once the agent responds, expand the chat message to inspect sub-agent outcomes (Planner, Vision, Geospatial maps).",
+        highlightElement: "left-advisor"
+      }
+    ],
+    weather: [
+      {
+        tab: "map",
+        instruction: "Step 1/2 (Geospatial Canopy Map): We've switched to the 'Geospatial & Climate' tab. Review live weather inputs (Temperature, Humidity) from IMD sensors.",
+        highlightElement: "weather-metrics"
+      },
+      {
+        tab: "map",
+        instruction: "Step 2/2 (Interactive Parcel Diagnostics): Click on 'Plot Parcel 101' on the map to trigger local water stress analysis.",
+        highlightElement: "map-parcel-container"
+      }
+    ],
+    explore: [
+      {
+        tab: "twin",
+        instruction: "Step 1/3 (Digital Twin Card): Inspect your live dynamic soil parameters (NPK, pH, carbon ratio) in the active tab.",
+        highlightElement: "twin-grid"
+      },
+      {
+        tab: "optimizer",
+        instruction: "Step 2/3 (Crop Optimization): Run the linear solver mix using Google OR-Tools equations.",
+        highlightElement: "optimizer-inputs"
+      },
+      {
+        tab: "map",
+        instruction: "Step 3/3 (Geospatial Map): Switch to the Geospatial tab to check satellite greenness trajectories.",
+        highlightElement: "map-parcel-container"
+      }
+    ]
+  };
+
+  // Synchronize Tab state automatically when onboarding steps progress
+  useEffect(() => {
+    if (demoActive && selectedIntention && tours[selectedIntention]) {
+      const currentTour = tours[selectedIntention][demoStep];
+      if (currentTour && currentTour.tab) {
+        setActiveTab(currentTour.tab);
+      }
+    }
+  }, [demoActive, demoStep, selectedIntention]);
 
   // Load default simulated digital twin once logged in
   useEffect(() => {
@@ -103,7 +182,6 @@ export default function App() {
   const fetchOrInitializeTwin = async () => {
     setTwinError("");
     try {
-      // 1. Attempt retrieval
       const getRes = await fetch(`${GATEWAY_URL}/api/v1/digital-twin/${agristackId}`);
       if (getRes.status === 200) {
         const data = await getRes.json();
@@ -111,7 +189,6 @@ export default function App() {
         return;
       }
 
-      // 2. Initialize Twin if not found
       const initPayload = {
         name: "Rajesh Kumar",
         phone: "9876543210",
@@ -169,7 +246,6 @@ export default function App() {
   const handleSendQuery = async (queryText = query) => {
     if (!queryText.trim()) return;
     
-    // Add user query to chat history log
     setChatHistory(prev => [...prev, { role: "user", text: queryText }]);
     setQuery("");
     setLoading(true);
@@ -187,7 +263,6 @@ export default function App() {
       const data = await res.json();
       if (res.ok) {
         setChatHistory(prev => [...prev, { role: "system", text: data.text_response }]);
-        // Trigger simulated audio TTS playback
         setIsPlayingAudio(true);
         setTimeout(() => setIsPlayingAudio(false), 5000);
       } else {
@@ -230,7 +305,7 @@ export default function App() {
 
       const payload = {
         total_land_hectares: parseFloat(landLimit),
-        water_budget_liters: parseFloat(waterLimit * 1000), // convert to liters
+        water_budget_liters: parseFloat(waterLimit * 1000), 
         capital_budget_rupees: parseFloat(capitalLimit),
         crop_options
       };
@@ -310,7 +385,6 @@ export default function App() {
     setChatHistory(prev => [...prev, { role: "system", text: "Listening to voice input..." }]);
     setTimeout(() => {
       setIsRecording(false);
-      // Mock audio translations
       const sampleQueries = [
         "What crop variety should I plant for my soil type?",
         "I found some worms chewing leaf stems, check for pest disease",
@@ -321,7 +395,31 @@ export default function App() {
     }, 3000);
   };
 
-  // Renders beautiful glassmorphic Aadhaar Login
+  // Intention onboarding submission
+  const startGuidedTour = (intentionKey) => {
+    setSelectedIntention(intentionKey);
+    setHasChosenIntention(true);
+    setDemoActive(true);
+    setDemoStep(0);
+  };
+
+  const skipGuidedTour = (intentionKey) => {
+    setSelectedIntention(intentionKey || "explore");
+    setHasChosenIntention(true);
+    setDemoActive(false);
+  };
+
+  // Helper check to apply highlighting class during guided tours
+  const getHighlightClass = (elementId) => {
+    if (!demoActive || !selectedIntention) return "";
+    const tour = tours[selectedIntention];
+    if (tour && tour[demoStep] && tour[demoStep].highlightElement === elementId) {
+      return "demo-highlight";
+    }
+    return "";
+  };
+
+  // Renders Aadhaar Verification Login
   if (!isLoggedIn) {
     return (
       <div className="app-container" style={{ justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
@@ -395,6 +493,68 @@ export default function App() {
     );
   }
 
+  // Renders Intention Selection Modal at first load after login
+  if (!hasChosenIntention) {
+    return (
+      <div className="app-container" style={{ justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+        <div className="glass-panel" style={{ width: '600px', padding: '36px', gap: '24px' }}>
+          <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+            <Compass size={32} color="var(--primary)" />
+            <h2 className="logo-text" style={{ fontSize: '26px' }}>Select Your Intent Today</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+              Help us customize your dashboard experience and direct you to the right tools.
+            </p>
+          </div>
+
+          <div className="intent-grid">
+            <div className="intent-card" onClick={() => startGuidedTour("optimize")}>
+              <div className="intent-title">
+                <Sliders size={18} color="var(--primary)" />
+                <span>Optimize Crop Plans</span>
+              </div>
+              <p className="intent-desc">Calculate the most profitable land allocations under resource caps using mathematical models.</p>
+            </div>
+
+            <div className="intent-card" onClick={() => startGuidedTour("advisor")}>
+              <div className="intent-title">
+                <Mic size={18} color="var(--primary)" />
+                <span>Consult AI Advisor</span>
+              </div>
+              <p className="intent-desc">Ask queries regarding plant pest diagnostics, weather threats, and fertilizer limits.</p>
+            </div>
+
+            <div className="intent-card" onClick={() => startGuidedTour("weather")}>
+              <div className="intent-title">
+                <Map size={18} color="var(--primary)" />
+                <span>Weather & Canopy Map</span>
+              </div>
+              <p className="intent-desc">Inspect NDVI greenness overlays, live local IMD alerts, and plot boundary trackers.</p>
+            </div>
+
+            <div className="intent-card" onClick={() => skipGuidedTour("explore")}>
+              <div className="intent-title">
+                <Database size={18} color="var(--primary)" />
+                <span>Free Exploration</span>
+              </div>
+              <p className="intent-desc">Skip tutorials and navigate the soil digital twins, solver modules, and API cards freely.</p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px', marginTop: '10px' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Guided onboarding takes about 2 minutes.</span>
+            <button className="btn-demo-nav" onClick={() => skipGuidedTour("explore")}>
+              Skip Tour & Open Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Dashboard Page with Onboarding Demo Banner
+  const tour = tours[selectedIntention];
+  const currentStepInfo = tour && tour[demoStep];
+
   return (
     <div className="app-container">
       <header>
@@ -406,6 +566,14 @@ export default function App() {
         </div>
 
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+          <button 
+            className="btn-demo-nav" 
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}
+            onClick={() => setHasChosenIntention(false)}
+          >
+            <Compass size={14} />
+            <span>Reset Intention</span>
+          </button>
           <div className="aadhaar-status">
             <ShieldCheck size={16} />
             <span>Aadhaar Verified</span>
@@ -414,9 +582,43 @@ export default function App() {
         </div>
       </header>
 
+      {/* Guided Tour Wizard Banner */}
+      {demoActive && currentStepInfo && (
+        <div className="demo-banner">
+          <div className="demo-content">
+            <span className="demo-badge">Tour Step {demoStep + 1} of {tour.length}</span>
+            <span className="demo-instruction">{currentStepInfo.instruction}</span>
+          </div>
+          <div className="demo-actions">
+            {demoStep > 0 && (
+              <button className="btn-demo-nav" onClick={() => setDemoStep(prev => prev - 1)}>
+                <ChevronLeft size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} /> Back
+              </button>
+            )}
+            {demoStep < tour.length - 1 ? (
+              <button className="btn-demo-nav primary" onClick={() => setDemoStep(prev => prev + 1)}>
+                Next <ChevronRight size={14} style={{ marginLeft: '4px', verticalAlign: 'middle' }} />
+              </button>
+            ) : (
+              <button className="btn-demo-nav primary" onClick={() => setDemoActive(false)}>
+                Finish Tour
+              </button>
+            )}
+            <button 
+              className="btn-demo-nav" 
+              style={{ padding: '6px 8px', color: 'var(--text-secondary)' }} 
+              onClick={() => setDemoActive(false)}
+              title="Skip Demo"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="dashboard-grid">
         {/* Left side: Voice Assistant chat portal */}
-        <div className="glass-panel assistant-panel">
+        <div className={`glass-panel assistant-panel ${getHighlightClass("left-advisor")}`}>
           <div className="panel-title">
             <Mic size={18} color="var(--primary)" />
             <span>Multilingual Advisor</span>
@@ -446,7 +648,7 @@ export default function App() {
             )}
           </div>
 
-          <div className="voice-input-area">
+          <div className={`voice-input-area ${getHighlightClass("mic-controls")}`}>
             <input 
               type="text" 
               placeholder="Ask about fertilizer, pest, or schemes..."
@@ -501,7 +703,7 @@ export default function App() {
                 <span>Dynamic State Snapshot (Soil & Crop Twin)</span>
               </div>
 
-              <div className="grid-container">
+              <div className={`grid-container ${getHighlightClass("twin-grid")}`}>
                 <div className="metric-card">
                   <span className="metric-label">Nitrogen (N)</span>
                   <div className="metric-value">{twinData.soil.nitrogen} kg/ha</div>
@@ -544,7 +746,7 @@ export default function App() {
                 <span>NDVI Greenness Parcel Map & Climate Diagnostics</span>
               </div>
 
-              <div className="map-placeholder">
+              <div className={`map-placeholder ${getHighlightClass("map-parcel-container")}`}>
                 <div className="map-grid-layer"></div>
                 <div className="map-parcel" onClick={() => handleSendQuery("Check the weather risk and soil moisture warnings")}>
                   <div style={{ textAlign: 'center' }}>
@@ -554,7 +756,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="grid-container">
+              <div className={`grid-container ${getHighlightClass("weather-metrics")}`}>
                 <div className="metric-card">
                   <span className="metric-label">Temperature</span>
                   <div className="metric-value">{twinData.weather.temperature} °C</div>
@@ -582,8 +784,8 @@ export default function App() {
                 <span>OR-Tools Optimal Crop Mix Allocation</span>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div className="grid-container" style={{ gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
+                <div className={`slider-container ${getHighlightClass("optimizer-inputs")}`} style={{ gap: '20px' }}>
                   <div className="slider-container">
                     <div className="slider-header">
                       <span>Total Land Area</span>
@@ -672,8 +874,8 @@ export default function App() {
                 <span>Hard Constraint Safety Verifier</span>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div className="grid-container" style={{ gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
+                <div className={`slider-container ${getHighlightClass("verifier-inputs")}`} style={{ gap: '20px' }}>
                   <div className="slider-container">
                     <div className="slider-header">
                       <span>Paddy land allocation</span>
